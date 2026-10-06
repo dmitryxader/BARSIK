@@ -1,0 +1,53 @@
+name: Build Barsik APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract Barsik source
+        run: |
+          mkdir -p source
+          unzip -q Barsik-1.2.0-GitHub-Actions.zip -d source
+
+      - name: Find Android project
+        run: |
+          GRADLEW=$(find source -type f -name gradlew | head -n 1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew not found"
+            find source -maxdepth 4 -type f | head -100
+            exit 1
+          fi
+
+          ROOT=$(dirname "$GRADLEW")
+          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_ROOT"
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare APK
+        run: |
+          APK=$(find "$PROJECT_ROOT" -type f -path "*/build/outputs/apk/debug/*.apk" | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK not found"
+            exit 1
+          fi
+
+          cp "$APK" "$GITHUB_WORKSPACE/Barsik-1.2-debug.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Barsik-1.2
+          path: Barsik-1.2-debug.apk
